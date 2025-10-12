@@ -1,14 +1,14 @@
-name: Release
+name: Preview Build
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - master
   workflow_dispatch:
 
 jobs:
   release:
-    name: Release
+    name: Preview Build
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -26,13 +26,16 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build with Gradle Wrapper
+      - name: Make Gradle Wrapper Executable
+        run: chmod +x ./gradlew
+     
+      - name: Build With Gradle Wrapper
         run: ./gradlew shadowJar
 
-      - name: Capture release artifacts
+      - name: Capture Release Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: =Artifacts
+          name: Artifacts
           path: |
             build/libs/*.jar
             !build/libs/*-sources.jar
