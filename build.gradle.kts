@@ -14,9 +14,6 @@ group = "com.r4g3baby"
 version = "4.0.2-dev"
 
 dependencies {
-    compileOnly(fileTree("libs") { include("*.jar") })
-    compileOnly("dev.folia:folia-api:1.21.6-R0.1-SNAPSHOT")
-    compileOnly("ca.spottedleaf:concurrentutil:0.0.6-SNAPSHOT")
     api(project("bukkit"))
 }
 
@@ -61,6 +58,10 @@ tasks {
     shadowJar {
         archiveFileName.set("${project.name}-${project.version}.jar")
 
+        manifest {
+            attributes["paperweight-mappings-namespace"] = "mojang"
+        }
+
         val libs = "${project.group}.${project.name.lowercase()}.lib"
         relocate("org.objenesis", "$libs.objenesis")
         relocate("net.swiftzer.semver", "$libs.semver")
@@ -102,7 +103,7 @@ tasks {
         projectId = property("modrinth.project") as String?
         uploadFile = shadowJar.get()
         gameVersions = mapVersions("modrinth.versions")
-        loaders = arrayListOf("bukkit", "spigot", "paper", "folia")
+        loaders = arrayListOf("bukkit", "spigot", "paper", "folia", "purpur")
         changelog = generateChangelog()
 
         syncBodyFrom = file("README.md").readText()

@@ -28,20 +28,28 @@ class MainConfig(plugin: BukkitPlugin) : BaseMainConfig<Player, YamlConfiguratio
 
     override fun loadVariables(config: YamlConfiguration) {
         version = config.getInt("version", version)
-        language = config.getString("language") ?: language
+        language = config.getString("language", language).toString()
         checkForUpdates = config.getBoolean("checkForUpdates", checkForUpdates)
         taskUpdateTime = config.getLong("taskUpdateTime", taskUpdateTime)
         scoreboardTaskAsync = config.getBoolean("scoreboardTaskAsync", scoreboardTaskAsync)
 
         if (config.isConfigurationSection("worlds")) {
-            val worldsSec = config.getConfigurationSection("worlds") ?: return
-            worldsSec.getKeys(false).forEach { worldName ->
+            val worldsSec = config.getConfigurationSection("worlds")
+            worldsSec?.getKeys(false)?.forEach { worldName ->
                 val pattern = Pattern.compile(worldName, Pattern.CASE_INSENSITIVE)
-                _worlds[pattern.asPredicate()] = when {
-                    worldsSec.isString(worldName) -> listOf(worldsSec.getString(worldName)!!)
-                    worldsSec.isList(worldName) -> worldsSec.getStringList(worldName).filterNotNull()
+                val scoreboardList: List<String> = when {
+                    worldsSec.isString(worldName) -> {
+                        val worldValue = worldsSec.getString(worldName)
+                        if (worldValue != null && worldValue.isNotBlank()) {
+                            listOf(worldValue)
+                        } else {
+                            emptyList()
+                        }
+                    }
+                    worldsSec.isList(worldName) -> worldsSec.getStringList(worldName)
                     else -> emptyList()
                 }
+                _worlds[pattern.asPredicate()] = scoreboardList
             }
         }
     }

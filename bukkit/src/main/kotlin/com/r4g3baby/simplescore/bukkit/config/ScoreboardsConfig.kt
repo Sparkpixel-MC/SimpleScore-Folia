@@ -22,7 +22,7 @@ import java.io.Reader
 class ScoreboardsConfig(
     private val plugin: BukkitPlugin, private val mainConfig: MainConfig
 ) : BaseScoreboardsConfig<Player, YamlConfiguration>(plugin.dataFolder) {
-    override val resourceName: String = "configs/scoreboards.yml"
+    override val resourceName: String = "scoreboards.yml" // 修复：移除错误的 "configs/" 前缀
 
     override fun parseConfigFile(reader: Reader?): YamlConfiguration {
         return if (reader != null) {
@@ -32,10 +32,7 @@ class ScoreboardsConfig(
 
     override fun loadVariables(config: YamlConfiguration) {
         config.getKeys(false).forEach { name ->
-            val section = config.getConfigurationSection(name) ?: run {
-                plugin.logger.warning("Missing section '$name' in scoreboards config.")
-                return@forEach
-            }
+            val section = config.getConfigurationSection(name) ?: return@forEach
 
             val defaultHideNumber = section.getBoolean("defaultHideNumber", false)
             val defaultVisibleFor = section.getInt("defaultVisibleFor", DEFAULT_VISIBLE_TICKS)
@@ -54,14 +51,14 @@ class ScoreboardsConfig(
             isList("scores") -> {
                 val scoresMapList = getMapList("scores")
                 mutableListOf<ScoreboardScore<Player>>().also { scores ->
-                    scoresMapList.forEachIndexed forEachScore@{ i, scoreMap ->
+                    scoresMapList.forEachIndexed { i, scoreMap ->
                         val scoreSec = MemoryConfiguration().createSection("${this.currentPath}.scores[$i]").apply {
-                            scoreMap.forEach { (key, value) -> addDefault(key.toString(), value) }
+                            scoreMap.forEach { (key, value) -> set(key.toString(), value) }
                         }
 
                         val score = scoreSec.get("score")?.toString() ?: run {
                             plugin.logger.warning("Missing 'score' value for '${scoreSec.currentPath}'.")
-                            return@forEachScore
+                            return@forEachIndexed
                         }
                         val lines = scoreSec.parseScoreboardLines("lines", defaultVisibleFor, defaultRenderEvery)
                         val conditions = scoreSec.parseConditions()
@@ -69,30 +66,28 @@ class ScoreboardsConfig(
                         var hideNumber = scoreSec.get("hideNumber")
                         if (hideNumber !is Boolean) hideNumber = defaultHideNumber
 
-                        scores.add(ScoreboardScore(score, lines, hideNumber, conditions))
+                        // 修复：使用正确的构造函数参数顺序
+                        scores.add(ScoreboardScore(score, lines, hideNumber as Boolean, conditions))
                     }
                 }
             }
 
             isConfigurationSection("scores") -> {
-                val sec = getConfigurationSection("scores") ?: run {
-                    plugin.logger.warning("Invalid 'scores' section for '${this.currentPath}.scores'.")
-                    return emptyList()
-                }
-
+                val section = getConfigurationSection("scores") ?: return emptyList()
                 mutableListOf<ScoreboardScore<Player>>().also { scores ->
-                    sec.getKeys(false).forEach forEachScore@{ scoreKey ->
-                        val scoreSec = sec.getConfigurationSection(scoreKey)
-                        if (scoreSec == null) {
-                            val lines = sec.parseScoreboardLines(scoreKey, defaultVisibleFor, defaultRenderEvery)
-                            scores.add(ScoreboardScore(scoreKey, lines, defaultHideNumber))
-                            return@forEachScore
+                    section.getKeys(false).forEach { score ->
+                        val scoreSec = section.getConfigurationSection(score) ?: run {
+                            val lines = section.parseScoreboardLines(score, defaultVisibleFor, defaultRenderEvery)
+                            // 修复：使用正确的构造函数参数顺序
+                            scores.add(ScoreboardScore(score, lines, defaultHideNumber, emptyList()))
+                            return@forEach
                         }
 
                         val lines = scoreSec.parseScoreboardLines("lines", defaultVisibleFor, defaultRenderEvery)
                         val hideNumber = scoreSec.getBoolean("hideNumber", defaultHideNumber)
                         val conditions = scoreSec.parseConditions()
-                        scores.add(ScoreboardScore(scoreKey, lines, hideNumber, conditions))
+                        // 修复：使用正确的构造函数参数顺序
+                        scores.add(ScoreboardScore(score, lines, hideNumber, conditions))
                     }
                 }
             }
@@ -107,51 +102,48 @@ class ScoreboardsConfig(
     private fun ConfigurationSection.parseScoreboardLines(path: String, defaultVisibleFor: Int, defaultRenderEvery: Int): List<ScoreboardLine<Player>> {
         return when {
             isString(path) -> {
-                val text = getString(path) ?: run {
-                    plugin.logger.warning("Missing '$path' value for '${this.currentPath}'.")
-                    return listOf(BlankLine())
-                }
+                val text = getString(path) ?: ""
                 listOf(if (text.isBlank()) BlankLine() else StaticLine(text, defaultRenderEvery))
             }
 
             isList(path) -> {
-                val rawList = getList(path) ?: emptyList<Any>()
-                if (rawList.any { it !is String && it !is Map<*, *> }) {
-                    mutableListOf<ScoreboardLine<Player>>().also { lineList ->
-                        rawList.forEachIndexed { i, line ->
-                            if (line !is Map<*, *>) {
-                                if (line is String) {
-                                    lineList.add(StaticLine(line, defaultRenderEvery))
-                                    return@forEachIndexed
-                                }
-                                plugin.logger.warning("Invalid frame value for '${this.currentPath}.$path[$i]'.")
-                                return@forEachIndexed
-                            }
+                val list = getList(path) ?: return emptyList()
 
-                            val section = MemoryConfiguration().createSection("${this.currentPath}.$path[$i]").apply {
-                                line.forEach { (key, value) -> addDefault(key.toString(), value) }
+                if (list.any { it !is String }) {
+                    mutableListOf<ScoreboardLine<Player>>().also { lineList ->
+                        list.forEachIndexed { i, line ->
+                            when (line) {
+                                is String -> lineList.add(StaticLine(line, defaultRenderEvery))
+                                is Map<*, *> -> {
+                                    val section = MemoryConfiguration().createSection("${this.currentPath}.$path[$i]").apply {
+                                        line.forEach { (key, value) -> set(key.toString(), value) }
+                                    }
+                                    if (section.contains("frames")) {
+                                        lineList.add(section.parseAnimatedLine(defaultVisibleFor, defaultRenderEvery))
+                                    } else {
+                                        lineList.add(section.parseStaticLine(defaultRenderEvery))
+                                    }
+                                }
+                                else -> {
+                                    plugin.logger.warning("Invalid frame value for '${this.currentPath}.$path[$i]'.")
+                                }
                             }
-                            if (section.contains("frames")) {
-                                lineList.add(section.parseAnimatedLine(defaultVisibleFor, defaultRenderEvery))
-                            } else lineList.add(section.parseStaticLine(defaultRenderEvery))
                         }
                     }
                 } else {
-                    val strings = getStringList(path).filterNotNull()
-                    listOf(AnimatedLine(strings.map {
+                    listOf(AnimatedLine(getStringList(path).map {
                         AnimatedLine.Frame(it, defaultVisibleFor, defaultRenderEvery)
                     }))
                 }
             }
 
             isConfigurationSection(path) -> {
-                val sec = getConfigurationSection(path) ?: run {
-                    plugin.logger.warning("Invalid section '$path' for '${this.currentPath}'.")
-                    return emptyList()
+                val section = getConfigurationSection(path) ?: return emptyList()
+                if (section.contains("frames")) {
+                    listOf(section.parseAnimatedLine(defaultVisibleFor, defaultRenderEvery))
+                } else {
+                    listOf(section.parseStaticLine(defaultRenderEvery))
                 }
-                if (sec.contains("frames")) {
-                    listOf(sec.parseAnimatedLine(defaultVisibleFor, defaultRenderEvery))
-                } else listOf(sec.parseStaticLine(defaultRenderEvery))
             }
 
             else -> {
@@ -174,7 +166,7 @@ class ScoreboardsConfig(
         if (renderEvery !is Int) renderEvery = defaultRenderEvery
 
         return if (!text.isBlank()) {
-            StaticLine(text, renderEvery, textEffects, conditions)
+            StaticLine(text, renderEvery as Int, textEffects, conditions)
         } else BlankLine(conditions)
     }
 
@@ -182,21 +174,16 @@ class ScoreboardsConfig(
         val textEffects = emptyList<TextEffect>()
         val conditions = parseConditions()
 
-        val rawFrames = getList("frames")
-        if (rawFrames == null) {
+        val textFrames = getList("frames") ?: run {
             if (isString("frames")) {
-                val s = getString("frames") ?: run {
-                    plugin.logger.warning("Missing 'frames' value for '${this.currentPath}'.")
-                    return BlankLine(conditions)
-                }
-                return StaticLine(s, defaultRenderEvery, textEffects, conditions)
+                return StaticLine(getString("frames")!!, defaultRenderEvery, textEffects, conditions)
             }
             plugin.logger.warning("Missing 'frames' value for '${this.currentPath}'.")
             return BlankLine(conditions)
         }
 
         val frames = mutableListOf<AnimatedLine.Frame>()
-        rawFrames.forEachIndexed { i, frame ->
+        textFrames.forEachIndexed { i, frame ->
             when (frame) {
                 is String -> frames.add(AnimatedLine.Frame(frame, defaultVisibleFor, defaultRenderEvery))
 
@@ -207,13 +194,12 @@ class ScoreboardsConfig(
                     var renderEvery = frame["renderEvery"]
                     if (renderEvery !is Int) renderEvery = defaultRenderEvery
 
-                    val textAny = frame["text"]
-                    if (textAny == null) {
+                    val text = frame["text"] ?: run {
                         plugin.logger.warning("Missing text value for frame '${this.currentPath}[$i]'.")
                         return@forEachIndexed
                     }
 
-                    frames.add(AnimatedLine.Frame(textAny.toString(), visibleFor, renderEvery))
+                    frames.add(AnimatedLine.Frame(text.toString(), visibleFor as Int, renderEvery as Int))
                 }
 
                 else -> {
@@ -222,36 +208,34 @@ class ScoreboardsConfig(
             }
         }
 
-        return AnimatedLine(frames, textEffects, conditions)
+        return if (frames.isNotEmpty()) {
+            AnimatedLine(frames, textEffects, conditions)
+        } else {
+            BlankLine(conditions)
+        }
     }
 
     private fun ConfigurationSection.parseConditions(): List<Condition<Player>> {
         fun getCondition(name: String): Condition<Player>? {
             return if (name.startsWith("!")) {
-                val n = name.substring(1)
-                mainConfig.conditions[n]?.let { Negate(it) }
+                val conditionName = name.substring(1)
+                mainConfig.conditions[conditionName]?.let { Negate(it) }
             } else mainConfig.conditions[name]
         }
 
         return when {
             isString("conditions") -> {
-                val name = getString("conditions") ?: run {
-                    plugin.logger.warning("Missing 'conditions' value for '${this.currentPath}.conditions'.")
-                    return emptyList()
-                }
-                listOf(getCondition(name) ?: run {
+                val name = getString("conditions") ?: return emptyList()
+                getCondition(name)?.let { listOf(it) } ?: run {
                     plugin.logger.warning("Unknown condition '$name' in '${this.currentPath}.conditions'.")
-                    return emptyList()
-                })
+                    emptyList()
+                }
             }
 
-            isList("conditions") -> {
-                val list = getStringList("conditions").filterNotNull()
-                list.mapNotNull {
-                    getCondition(it) ?: run {
-                        plugin.logger.warning("Unknown condition '$it' in '${this.currentPath}.conditions'.")
-                        return@mapNotNull null
-                    }
+            isList("conditions") -> getStringList("conditions").mapNotNull {
+                getCondition(it) ?: run {
+                    plugin.logger.warning("Unknown condition '$it' in '${this.currentPath}.conditions'.")
+                    null
                 }
             }
 
