@@ -1,0 +1,20 @@
+name: InsurancePlugin
+version: 1.0.0
+main: com.example.insurance.InsurancePlugin
+api-version: 1.16
+depend: []
+softdepend: [Slimefun]
+
+commands:
+  insurance:
+    description: 管理物品保险
+    usage: /insurance <add|remove|info> [player] [level] [uses]
+    permission: insurance.use
+
+permissions:
+  insurance.use:
+    description: 使用保险插件的权限
+    default: true
+  insurance.admin:
+    description: 管理员权限
+    default: op
