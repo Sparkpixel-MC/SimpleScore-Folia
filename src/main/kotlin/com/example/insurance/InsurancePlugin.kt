@@ -8,6 +8,7 @@ import org.bukkit.persistence.PersistentDataType
 import org.bukkit.event.EventHandler
 import org.bukkit.event.inventory.PrepareItemCraftEvent
 import org.bukkit.event.inventory.CraftItemEvent
+import org.bukkit.ChatColor
 
 class InsurancePlugin : JavaPlugin(), Listener {
     
@@ -112,8 +113,8 @@ class InsurancePlugin : JavaPlugin(), Listener {
         for (i in 0 until inventory.matrix.size) {
             val item = inventory.matrix[i]
             if (item != null && hasInsurance(item)) {
-                // 临时移除保险数据以便合成系统识别
-                val tempItem = removeInsuranceData(item)
+                // 使用CraftingHelper为合成准备物品
+                val tempItem = CraftingHelper.prepareItemForCrafting(item)
                 inventory.matrix[i] = tempItem
             }
         }
@@ -153,32 +154,8 @@ class InsurancePlugin : JavaPlugin(), Listener {
         
         // 如果有带保险的输入物品，将保险应用到结果物品
         if (highestInsuranceLevel > 0 && insuranceItemsCount > 0) {
-            setInsurance(result, highestInsuranceLevel, totalInsuranceUses)
-            event.inventory.result = result
+            val finalResult = CraftingHelper.transferInsuranceToResult(matrix, result)
+            event.inventory.result = finalResult
         }
-    }
-    
-    /**
-     * 临时移除保险数据，用于合成匹配
-     */
-    private fun removeInsuranceData(item: ItemStack): ItemStack {
-        val clone = item.clone()
-        val meta = clone.itemMeta ?: return clone
-        
-        // 移除保险相关的持久数据
-        meta.persistentDataContainer.remove(INSURANCE_LEVEL_KEY)
-        meta.persistentDataContainer.remove(INSURANCE_USES_KEY)
-        
-        // 也移除可能影响合成的lore
-        val lore = meta.lore
-        if (lore != null) {
-            val filteredLore = lore.filter { !it.contains("保险") && !it.contains("Insurance") }
-            if (filteredLore.size != lore.size) {
-                meta.lore = filteredLore
-            }
-        }
-        
-        clone.itemMeta = meta
-        return clone
     }
 }

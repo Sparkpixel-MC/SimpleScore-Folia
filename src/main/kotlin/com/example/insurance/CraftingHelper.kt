@@ -6,6 +6,7 @@ import org.bukkit.NamespacedKey
 import org.bukkit.persistence.PersistentDataContainer
 import org.bukkit.persistence.PersistentDataType
 import org.bukkit.ChatColor
+import org.bukkit.Material
 
 /**
  * 合成辅助工具类

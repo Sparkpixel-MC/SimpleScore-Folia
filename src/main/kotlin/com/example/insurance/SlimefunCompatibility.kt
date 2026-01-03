@@ -7,6 +7,8 @@ import org.bukkit.event.inventory.PrepareItemCraftEvent
 import org.bukkit.event.inventory.CraftItemEvent
 import org.bukkit.event.inventory.InventoryClickEvent
 import org.bukkit.event.inventory.InventoryType
+import org.bukkit.NamespacedKey
+import org.bukkit.persistence.PersistentDataType
 
 /**
  * 粘液科技（Slimefun）兼容性处理类
