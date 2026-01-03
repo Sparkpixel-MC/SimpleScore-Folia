@@ -1,62 +1,58 @@
 ```
-# Gradle
-.gradle/
-build/
-target/
-
-# Compiled files
+# Compiled and build artifacts
+temp/
 *.class
 *.jar
-*.war
-*.ear
-*.zip
-*.tar
-*.tar.gz
 
-# IDE files
-.idea/
-*.iml
-*.iws
-.vscode/
+# Dependencies
+.gradle/
+node_modules/
 
-# Logs
+# Logs and temp files
 *.log
+*.tmp
+
+# Editors
+.vscode/
+.idea/
 
 # Environment
 .env
 .env.local
 *.env.*
 
-# Temporary files
-*.tmp
-*.temp
-*~
-
-# OS generated files
-.DS_Store
-Thumbs.db
-
-# Test coverage
+# Coverage reports
 coverage/
 htmlcov/
 *.coverage
 
-# Package manager
-node_modules/
+# Build system
+build/
+dist/
+target/
 
-# Python (in case of mixed project)
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 .Python
-env/
-venv/
-.venv/
-pip-log.txt
-pip-delete-this-directory.txt
 *.so
 
-# Local configuration
-local.properties
+# Java
+*.class
+*.jar
+*.war
+*.ear
+
+# Gradle
+.gradle/
+build/
+
+# Temporary files
+*.tmp
+*.temp
+*~
+.DS_Store
+Thumbs.db
 ```
